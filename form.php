@@ -1,20 +1,29 @@
 <?php
 use foundationphp\UploadFile;
 
-$max = 50 * 1024; //x * 1kb
+session_start();
+require_once 'src/foundationphp/UploadFile.php';
+
+if(!isset($_SESSION['maxfiles'])){
+	$_SESSION['maxfiles'] = ini_get('max_file_uploads');
+	$_SESSION['postmax'] = UploadFile::convertToBytes(ini_get('post_max_size'));
+	$_SESSION['displaymax'] = UploadFile::convertFromBytes($_SESSION['postmax']);
+}
+$max = 50 * 1024; //x * 1024b (1kb)
 $result = array();
 if (isset($_POST['upload'])){
-	require_once 'src/foundationphp/UploadFile.php';
 	$destination = __DIR__ . '/uploaded/'; //create directory in same level as this script. Must be fully qualified
 	try {
 		$upload = new UploadFile($destination);
 		$upload->setMaxSize($max);
+		//$upload->allowAllTypes();
 		$upload->upload();
 		$result = $upload->getMessages();
 	} catch (Exception $e){
 		$$result[] = $e->getMessage();
 	}
 }
+$error = error_get_last();
 ?>
 <!DOCTYPE html>
 <html>
@@ -26,11 +35,16 @@ if (isset($_POST['upload'])){
 <body>
 	<h1>Uploading Files</h1>
 	<?php
-		if($result){ ?>
+		if($result || $error){ ?>
 			<ul class="reuslt">
 				<?php
-				foreach($result as $message){
-					echo "<li>$message</li>";
+				if($error){
+					echo "<li>{$error['message']}</li>";
+				}
+				if($result){
+					foreach($result as $message){
+						echo "<li>$message</li>";
+					}
 				}
 				?>
 			</ul>
@@ -38,14 +52,22 @@ if (isset($_POST['upload'])){
 	<form action="<?php echo $_SERVER['PHP_SELF']; ?>" method="post" enctype="multipart/form-data">
 		<p>
 			<input type="hidden" name="MAX_FILE_SIZE" vale="<?php echo $max; ?>">
-		</p>
-		<p>
 			<label for="filename">Select File:</label>
-			<input type="file" name="filename" id='label'>
+			<input type="file" name="filename[]" id='label' multiple
+					data-maxfiles="<?php echo $_SESSION['maxfiles']; ?>"
+					data-postmax="<?php echo $_SESSION['postmax']; ?>"
+					data-displaymax="<?php echo $_SESSION['displaymax']; ?>"
+			>
+			<ul>
+				<li>Up to <?php echo $_SESSION['maxfiles']; ?> files can be uploaded simultaneously</li>
+				<li>Each file should be no more than <?php echo UploadFile::convertFromBytes($max);?>.</li>
+				<li>Combined total should not exceed <?php echo S_SESSION['displaymax']; ?></li>
+			</ul>
 		</p>
 		<p>
 			<input type="submit" name="upload" value="Upload File">
 		</p>
 	</form>
+	<script type="text/javascript" src="js/checkmultiple.js"></script>
 </body>
 </html>
